@@ -17,7 +17,7 @@ HttpTool::~HttpTool()
 	chunk.size = 0;
 }
 
-size_t WriteData(void* ptr, size_t size, size_t nmemb, void* stream)
+size_t HttpTool::WriteData(void * ptr, size_t size, size_t nmemb, void * stream)
 {
 	size_t realsize = size * nmemb;
 	_MEMORYSTRUNCT* mem = (_MEMORYSTRUNCT*)stream;
