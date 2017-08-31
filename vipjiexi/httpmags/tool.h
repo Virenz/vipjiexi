@@ -283,8 +283,8 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 																		//发送http请求头
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 		char url[256] = "https://passport.csdn.net/account/login?from=http%3A%2F%2Fdownload.csdn.net%2Fmy%2Fdownloads";
-		char strpost[256] = "username=460560842%40qq.com&password=198584&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit";
-		//sprintf(strpost, "username=%s&password=%s&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit", strUser.c_str(), strPass.c_str());
+		char strpost[256];// = "username=460560842%40qq.com&password=198584&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit";
+		sprintf(strpost, "username=%s&password=%s&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit", strUser.c_str(), strPass.c_str());
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_POST, 1);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, strpost);
@@ -300,8 +300,24 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 		//执行http请求
 		res = curl_easy_perform(curl);
 
+		std::string returnVal;
+		Utf8ToMb((char*)content.c_str(), content.length(), returnVal);
+		int pos = returnVal.find("\"status\":true");
+		if (pos >= 0) {
+			returnInfo.bReturn = TRUE;
+			int nStartPos = content.find("data\":");
+			int nEndPos = content.rfind("\"}}");
+			returnInfo.data = content.substr(nStartPos + 6, nEndPos - nStartPos - 4);
+		}
+		else {
+			int nStartPos = returnVal.find("error\":");
+			int nEndPos = returnVal.find("data\":", nStartPos);
+			returnInfo.strErrorInfo = returnVal.substr(nStartPos + 8, nEndPos - nStartPos - 11);
+		}
+
+
 		/* Check for errors */
-		if (res != CURLE_OK)
+		/*if (res != CURLE_OK)
 		{
 			fprintf(stderr, "curl_easy_perform() failed: %s\n",
 				curl_easy_strerror(res));
@@ -316,7 +332,7 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 				returnInfo.bReturn = TRUE;
 				returnInfo.data = "success";
 			}
-		}
+		}*/
 
 		//释放资源
 		curl_easy_cleanup(curl);

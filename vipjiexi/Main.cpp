@@ -8,10 +8,13 @@
 
 INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
 void performActions(HWND hwnd);												// 获取单选框和编辑框进行对应的操作
+HINSTANCE hthisapp;
+HWND hdlg;
 
 int WINAPI WinMain(HINSTANCE hThisApp, HINSTANCE hPrevApp, LPSTR lpCmd, int nShow)
 {
-	HWND hdlg = CreateDialog(hThisApp, MAKEINTRESOURCE(IDD_CSDNLOGIN), NULL, (DLGPROC)DlgProc);
+	hthisapp = hThisApp;
+	hdlg = CreateDialog(hthisapp, MAKEINTRESOURCE(IDD_CSDNLOGIN), NULL, (DLGPROC)DlgProc);
 
 	if (!hdlg)
 	{
@@ -59,9 +62,12 @@ INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 			ReturnInfo returnInfo = LoginServer(m_user, m_pwd);
 			if (returnInfo.bReturn == TRUE)
 			{
+				EndDialog(hDlg, IDCANCEL);
+				hdlg = CreateDialog(hthisapp, MAKEINTRESOURCE(IDD_CSDN), NULL, (DLGPROC)DlgProc);
+				ShowWindow(hdlg, SW_SHOW);
 				//登录成功
-				MessageBoxA(hDlg, returnInfo.data.c_str(),
-					"登录成功", MB_OK | MB_ICONINFORMATION);
+				/*MessageBoxA(hDlg, returnInfo.data.c_str(),
+					"登录成功", MB_OK | MB_ICONINFORMATION);*/
 			}
 			else {
 				//登录失败
