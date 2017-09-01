@@ -13,6 +13,15 @@ typedef struct tagDownResourceInfo
 	BOOL		bComment;			//是否评论过
 }DownResourceInfo;
 
+// 登录post
+typedef struct tagPostInfo
+{
+	std::string	username;
+	std::string password;
+	std::string lt;
+	std::string	execution;
+	std::string _eventId;
+}PostInfo;
 
 // 登录结果
 typedef struct tagReturnInfo
@@ -210,7 +219,7 @@ static bool Utf8ToMb(char* strStcText, int nLen, std::string &strDstText)
 		return false;
 	}
 	// convert an widechar string to Multibyte  
-	int MBLen = WideCharToMultiByte(CP_ACP, 0, strTemp, nWLen, NULL, 0, NULL, NULL);
+	int MBLen = WideCharToMultiByte(CP_UTF8, 0, strTemp, nWLen, NULL, 0, NULL, NULL);
 	if (0 == MBLen)
 	{
 		free(strTemp);
@@ -221,7 +230,7 @@ static bool Utf8ToMb(char* strStcText, int nLen, std::string &strDstText)
 	{
 		return false;
 	}
-	nRtn = WideCharToMultiByte(CP_ACP, 0, strTemp, nWLen, str, MBLen, NULL, NULL);
+	nRtn = WideCharToMultiByte(CP_UTF8, 0, strTemp, nWLen, str, MBLen, NULL, NULL);
 	if (0 == nRtn)
 	{
 		free(strTemp);
@@ -241,6 +250,89 @@ static long writer(void *data, int size, int nmemb, std::string &content)
 	std::string temp((char*)data, sizes);
 	content += temp;
 	return sizes;
+}
+
+static std::string GetPostParam(const char * sourses, const char* user, const char* pwd)
+{
+	bool isSuccess = false;
+	std::string chunk;
+	char postparam[256];
+	long http_response_code = 0;
+
+	PostInfo postInfo;
+	postInfo.username = "460560842%40qq.com";
+	postInfo.password = "198584";
+
+	CURL *curl;
+	CURLcode res;
+
+	curl_global_init(CURL_GLOBAL_ALL);
+	curl = curl_easy_init();
+	/* initalize custom header list (stating that Expect: 100-continue is not
+	wanted */
+
+	if (curl) {
+		/* what URL that receives this GET */
+		curl_easy_setopt(curl, CURLOPT_URL, sourses);
+
+		//通过write_data方法将联网返回数据写入到data中
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writer);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+		/* Perform the request, res will get the return code */
+
+		res = curl_easy_perform(curl);
+		/* Check for errors */
+		if (res != CURLE_OK)
+		{
+			fprintf(stderr, "curl_easy_perform() failed: %s\n",
+				curl_easy_strerror(res));
+			isSuccess = false;
+		}
+		else
+		{
+			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_response_code);
+			if (http_response_code == 200)
+			{
+				int nPos = 0;
+				int n = 0;
+				int flag = 1;
+				if ((nPos = chunk.find("name=\"lt\" value=", n)) != -1)
+				{
+					n = nPos + 17;
+					int nEndPos = chunk.find("\" />", n);
+					std::string strlt = chunk.substr(n, nEndPos - n);
+					postInfo.lt = strlt;
+				}
+				if ((nPos = chunk.find("name=\"execution\" value=", n)) != -1)
+				{
+					n = nPos + 24;
+					int nEndPos = chunk.find("\" />", n);
+					std::string strexecution = chunk.substr(n, nEndPos - n);
+					postInfo.execution = strexecution;
+				}
+				if ((nPos = chunk.find("name=\"_eventId\" value=", n)) != -1)
+				{
+					n = nPos + 23;
+					int nEndPos = chunk.find("\" />", n);
+					std::string strsubmit = chunk.substr(n, nEndPos - n);
+					postInfo._eventId = strsubmit;
+				}
+				
+				isSuccess = true;
+			}
+		}
+
+		/* always cleanup */
+		curl_easy_cleanup(curl);
+	}
+	if (isSuccess)
+	{
+		sprintf(postparam, "username=%s&password=%s&lt=%s&execution=%s&_eventId=%s", postInfo.username.c_str(), postInfo.password.c_str(), postInfo.lt.c_str(), postInfo.execution.c_str(), postInfo._eventId.c_str());
+	}
+	return std::string(postparam);
 }
 
 /************************************************************************
@@ -273,7 +365,7 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 		headers = curl_slist_append(headers, "Host:passport.csdn.net");
 		headers = curl_slist_append(headers, "Accept:*/*");
 		headers = curl_slist_append(headers, "Accept-Language:zh-cn,zh;q=0.8,en-us;q=0.5,en;q=0.3");
-		headers = curl_slist_append(headers, "Accept-Encoding:gzip, deflate");
+		//headers = curl_slist_append(headers, "Accept-Encoding:gzip, deflate");
 		headers = curl_slist_append(headers, "X-Requested-With:XMLHttpRequest");
 		headers = curl_slist_append(headers, "Referer:https://passport.csdn.net/account/login?from=http%3A%2F%2Fdownload.csdn.net%2Fmy%2Fdownloads");
 		headers = curl_slist_append(headers, "Connection:keep-alive");
@@ -283,11 +375,11 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 																		//发送http请求头
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 		char url[256] = "https://passport.csdn.net/account/login?from=http%3A%2F%2Fdownload.csdn.net%2Fmy%2Fdownloads";
-		char strpost[256];// = "username=460560842%40qq.com&password=198584&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit";
-		sprintf(strpost, "username=%s&password=%s&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit", strUser.c_str(), strPass.c_str());
+		//char strpost[256] = "username=460560842%40qq.com&password=198584&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit";
+		std::string strpost = GetPostParam(url, strUser.c_str(), strPass.c_str());
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_POST, 1);
-		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, strpost);
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, strpost.c_str());
 
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -302,37 +394,16 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 
 		std::string returnVal;
 		Utf8ToMb((char*)content.c_str(), content.length(), returnVal);
-		int pos = returnVal.find("\"status\":true");
+		int pos = returnVal.find("redirect_back");
 		if (pos >= 0) {
 			returnInfo.bReturn = TRUE;
-			int nStartPos = content.find("data\":");
+			int nStartPos = content.find("data =");
 			int nEndPos = content.rfind("\"}}");
 			returnInfo.data = content.substr(nStartPos + 6, nEndPos - nStartPos - 4);
 		}
 		else {
-			int nStartPos = returnVal.find("error\":");
-			int nEndPos = returnVal.find("data\":", nStartPos);
-			returnInfo.strErrorInfo = returnVal.substr(nStartPos + 8, nEndPos - nStartPos - 11);
+			returnInfo.strErrorInfo = "failure";
 		}
-
-
-		/* Check for errors */
-		/*if (res != CURLE_OK)
-		{
-			fprintf(stderr, "curl_easy_perform() failed: %s\n",
-				curl_easy_strerror(res));
-			returnInfo.bReturn = FALSE;
-			returnInfo.strErrorInfo = curl_easy_strerror(res);
-		}
-		else
-		{
-			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_response_code);
-			if (http_response_code == 200)
-			{
-				returnInfo.bReturn = TRUE;
-				returnInfo.data = "success";
-			}
-		}*/
 
 		//释放资源
 		curl_easy_cleanup(curl);
