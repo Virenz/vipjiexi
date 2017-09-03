@@ -260,11 +260,15 @@ static std::string GetPostParam(const char * sourses, const char* user, const ch
 	long http_response_code = 0;
 
 	PostInfo postInfo;
-	postInfo.username = "460560842%40qq.com";
-	postInfo.password = "198584";
+	postInfo.username =	user;
+	postInfo.password = pwd;
 
 	CURL *curl;
 	CURLcode res;
+	struct curl_slist *headers = NULL;
+	struct curl_slist *cookies;
+    struct curl_slist * nc;
+	std::string strCookie;                //存放cookie
 
 	curl_global_init(CURL_GLOBAL_ALL);
 	curl = curl_easy_init();
@@ -272,16 +276,31 @@ static std::string GetPostParam(const char * sourses, const char* user, const ch
 	wanted */
 
 	if (curl) {
+		//初始化cookie引擎
+		curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
+		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+		//http请求头
+		headers = curl_slist_append(headers, "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36");	//模拟浏览器
+		headers = curl_slist_append(headers, "Host:passport.csdn.net");
+		headers = curl_slist_append(headers, "Accept:*/*");
+		headers = curl_slist_append(headers, "Accept-Language:zh-cn,zh;q=0.8,en-us;q=0.5,en;q=0.3");
+		//headers = curl_slist_append(headers, "Accept-Encoding:gzip, deflate");
+		headers = curl_slist_append(headers, "X-Requested-With:XMLHttpRequest");
+		headers = curl_slist_append(headers, "Connection:keep-alive");
+		
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 		/* what URL that receives this GET */
 		curl_easy_setopt(curl, CURLOPT_URL, sourses);
 
 		//通过write_data方法将联网返回数据写入到data中
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writer);
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
 
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 		/* Perform the request, res will get the return code */
+		curl_easy_setopt(curl, CURLOPT_COOKIEJAR, "cookie.txt");		//把服务器发过来的cookie保存到cookie.txt
 
 		res = curl_easy_perform(curl);
 		/* Check for errors */
@@ -345,6 +364,9 @@ strErrMsg		错误消息
 ************************************************************************/
 static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 {
+	char url[256] = "https://passport.csdn.net/account/login?from=http%3A%2F%2Fdownload.csdn.net%2Fmy%2Fdownloads";
+	std::string strpost = GetPostParam(url, strUser.c_str(), strPass.c_str());
+
 	long http_response_code = 0;
 
 	ReturnInfo returnInfo;
@@ -357,11 +379,11 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 	curl = curl_easy_init();
 	if (curl) {
 		//初始化cookie引擎
-		curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
+		curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "cookie.txt");
 		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
 		//http请求头
-		headers = curl_slist_append(headers, "User-Agent:Mozilla/5.0 (Windows NT 6.1; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0");	//模拟浏览器
+		headers = curl_slist_append(headers, "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36");	//模拟浏览器
 		headers = curl_slist_append(headers, "Host:passport.csdn.net");
 		headers = curl_slist_append(headers, "Accept:*/*");
 		headers = curl_slist_append(headers, "Accept-Language:zh-cn,zh;q=0.8,en-us;q=0.5,en;q=0.3");
@@ -369,14 +391,14 @@ static ReturnInfo LoginServer(std::string strUser, std::string strPass)
 		headers = curl_slist_append(headers, "X-Requested-With:XMLHttpRequest");
 		headers = curl_slist_append(headers, "Referer:https://passport.csdn.net/account/login?from=http%3A%2F%2Fdownload.csdn.net%2Fmy%2Fdownloads");
 		headers = curl_slist_append(headers, "Connection:keep-alive");
-
+		
 		curl_easy_setopt(curl, CURLOPT_COOKIEJAR, "cookie.txt");		//把服务器发过来的cookie保存到cookie.txt
 
 																		//发送http请求头
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-		char url[256] = "https://passport.csdn.net/account/login?from=http%3A%2F%2Fdownload.csdn.net%2Fmy%2Fdownloads";
-		//char strpost[256] = "username=460560842%40qq.com&password=198584&lt=LT-445957-IEfKkNqFPFIdCXTfLM7ZeDcqxItUnd&execution=e4s1&_eventId=submit";
-		std::string strpost = GetPostParam(url, strUser.c_str(), strPass.c_str());
+		
+		//char strpost[256] = "username=460560842%40qq.com&password=198584&lt=LT-54704-kUQaN7jjV0PykW9cV51S9CtzIdneLk&execution=e18s1&_eventId=submit";
+		
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_POST, 1);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, strpost.c_str());
