@@ -104,6 +104,7 @@ void ShowDownInfo(HWND hwnd)
 {
 	// 获取ListView控件的句柄  
 	HWND hListview = GetDlgItem(hwnd, IDC_RESLIST);
+	HWND hProgress = GetDlgItem(hwnd, IDC_PROGRESS);
 	// 设置ListView的列  
 	LVCOLUMN vcl;
 	vcl.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
@@ -180,13 +181,18 @@ void ShowDownInfo(HWND hwnd)
 		else
 			SetDlgItemTextA(hwnd, IDC_SHOWFINISH, FormatString("第%d页",pageNum).c_str());
 		// 给进度条发送消息，传入当前上传的值
-		SendMessage(hwnd, PBM_SETPOS, pageNum*100/m_totalPage, 0L);
 		pageNum++;
+		SendMessage(hProgress, PBM_SETPOS, pageNum*100/m_totalPage, 0L);
 	}
+	// 加载完成，激活“开始评论按钮”
+	EnableWindow(GetDlgItem(hwnd, IDC_STARTCOMMENT), TRUE);
 }
 
 void StartAddComment(HWND hwnd)
 {
+	// 点击开始评论期间，“开始评论按钮”处于不可点击状态
+	EnableWindow(GetDlgItem(hwnd, IDC_STARTCOMMENT), FALSE);
+
 	// 获取ListView控件的句柄  
 	HWND hListview = GetDlgItem(hwnd, IDC_RESLIST);
 	int listCounts = ListView_GetItemCount(hListview);
@@ -208,4 +214,7 @@ void StartAddComment(HWND hwnd)
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(60000));//60秒评论一次
 	}
+
+	// 加载完成，激活“开始评论按钮”
+	EnableWindow(GetDlgItem(hwnd, IDC_STARTCOMMENT), TRUE);
 }
