@@ -8,8 +8,8 @@
 typedef struct tagDownResourceInfo
 {
 	int			rowNum;				//行号
-	std::string	strResourceName;	//资源名称
-	std::string	strResourceCurl;	//资源id
+	std::wstring	strResourceName;	//资源名称
+	std::wstring	strResourceCurl;	//资源id
 	BOOL		bComment;			//是否评论过
 }DownResourceInfo;
 
@@ -174,15 +174,28 @@ static BOOL UrlDecode(const char* szSrc, char* pBuf, int cbBufLen)
 	return TRUE;
 }
 
-static void StringToWstring(std::wstring& szDst, std::string& str)
+static std::wstring StringToWstring(std::string& str)
 {
 	std::string temp = str;
 	int len = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)temp.c_str(), -1, NULL, 0);
 	wchar_t * wszUtf8 = new wchar_t[len + 1];
 	memset(wszUtf8, 0, len * 2 + 2);
 	MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)temp.c_str(), -1, (LPWSTR)wszUtf8, len);
+	std::wstring szDst;
 	szDst = wszUtf8;
 	delete[] wszUtf8;
+	return szDst;
+}
+
+static void Wchar_tToString(std::string& szDst, wchar_t *wchar)
+{
+	wchar_t * wText = wchar;
+	DWORD dwNum = WideCharToMultiByte(CP_OEMCP, NULL, wText, -1, NULL, 0, NULL, FALSE);// WideCharToMultiByte的运用
+	char *psText;  // psText为char*的临时数组，作为赋值给std::string的中间变量
+	psText = new char[dwNum];
+	WideCharToMultiByte(CP_OEMCP, NULL, wText, -1, psText, dwNum, NULL, FALSE);// WideCharToMultiByte的再次运用
+	szDst = psText;// std::string赋值
+	delete[]psText;// psText的清除
 }
 
 static std::string FormatString(const char * lpcszFormat, ...)
@@ -201,6 +214,22 @@ static std::string FormatString(const char * lpcszFormat, ...)
 	std::string strResult(pszStr);
 	delete[]pszStr;
 	return strResult;
+}
+
+static std::wstring UTF8_To_wstring(const std::string & str)
+{
+	int nwLen = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+
+	wchar_t * pwBuf = new wchar_t[nwLen + 1];//一定要加1，不然会出现尾巴 
+	memset(pwBuf, 0, nwLen * 2 + 2);
+
+	MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.length(), pwBuf, nwLen);
+
+	std::wstring retStr = pwBuf;
+	delete[]pwBuf;
+	pwBuf = NULL;
+
+	return retStr;
 }
 
 static bool Utf8ToMb(char* strStcText, int nLen, std::string &strDstText)
@@ -460,7 +489,7 @@ static bool InitCurl(CURL *easy_handle, CURLcode &res, std::string &url, std::st
 	return TRUE;
 }
 //获取之前下载的资源列表
-static std::string GetHtmlPage(std::string url)
+static std::wstring GetHtmlPage(std::string url)
 {
 	CURL *easy_handle;
 	CURLcode res;
@@ -470,7 +499,7 @@ static std::string GetHtmlPage(std::string url)
 	if (easy_handle)
 	{
 		//初始化cookie引擎
-		curl_easy_setopt(easy_handle, CURLOPT_COOKIEFILE, "");
+		curl_easy_setopt(easy_handle, CURLOPT_COOKIEFILE, "cookie.txt");
 		curl_easy_setopt(easy_handle, CURLOPT_TIMEOUT, 5);			//设置请求超时时间
 																	//curl_easy_setopt(easy_handle,CURLOPT_VERBOSE,1);			//输出请求头和响应头
 																	//curl_easy_setopt(easy_handle,CURLOPT_HEADER,1);
@@ -500,8 +529,8 @@ static std::string GetHtmlPage(std::string url)
 		curl_easy_cleanup(easy_handle);
 	}
 	curl_global_cleanup();
-	std::string tt;
-	Utf8ToMb((char *)content.c_str(), content.length(), tt);
+	std::wstring tt = UTF8_To_wstring(content);
+	//Utf8ToMb((char *)content.c_str(), content.length(), tt);
 	return tt;
 }
 
@@ -510,14 +539,14 @@ static int GetTotalPageNum()
 {
 	std::string url = "http://download.csdn.net/my/downloads/1";
 
-	std::string html = GetHtmlPage(url);
-	int nPos = html.rfind("尾页");
+	std::wstring html = GetHtmlPage(url);
+	int nPos = html.rfind(L"尾页");
 	if (nPos == -1)
 		return -1;
 	nPos -= 2;
-	int nStartPos = html.rfind("/", nPos);
-	std::string strTotal = html.substr(nStartPos + 1, nPos - nStartPos - 1);
-	return atoi(strTotal.c_str());
+	int nStartPos = html.rfind(L"/", nPos);
+	std::wstring strTotal = html.substr(nStartPos + 1, nPos - nStartPos - 1);
+	return _wtoi(strTotal.c_str());
 }
 
 //获取待评论的资源列表
@@ -526,25 +555,25 @@ static std::vector<DownResourceInfo> GetToCommentList(int pageNum)
 	std::vector<DownResourceInfo> vtDownload;
 	char url[128] = { 0 };
 	sprintf(url, "http://download.csdn.net/my/downloads/%d", pageNum);
-	std::string html = GetHtmlPage(url);
+	std::wstring html = GetHtmlPage(url);
 	int nPos = 0;
 	int n = 0;
 	int flag = 1;
-	while ((nPos = html.find("#comment", n)) != -1)
+	while ((nPos = html.find(L"#comment", n)) != -1)
 	{
 		n = nPos + 1;
-		int nStartPos = html.rfind("/", nPos);
-		std::string strUrl = html.substr(nStartPos + 1, nPos - nStartPos - 1);
+		int nStartPos = html.rfind(L"/", nPos);
+		std::wstring strUrl = html.substr(nStartPos + 1, nPos - nStartPos - 1);
 		DownResourceInfo info;
 		info.strResourceCurl = strUrl;
 		//获取资源的名字
-		nStartPos = html.find(strUrl, nPos + 1);
+		nStartPos = html.rfind(strUrl, nStartPos);
 		if (nStartPos == -1)
 			return vtDownload;
 		nStartPos += 2;
 		nStartPos += strUrl.length();
-		int nEndPos = html.find("</a>", nStartPos);
-		std::string ResourceName = html.substr(nStartPos, nEndPos - nStartPos);
+		int nEndPos = html.find(L"</a>", nStartPos);
+		std::wstring ResourceName = html.substr(nStartPos, nEndPos - nStartPos);
 		info.strResourceName = ResourceName;
 		vtDownload.push_back(info);
 	}
@@ -561,9 +590,9 @@ static BOOL AddComment(std::string sourceId)
 	if (easy_handle)
 	{
 		//初始化cookie引擎
-		curl_easy_setopt(easy_handle, CURLOPT_COOKIEFILE, "");
+		curl_easy_setopt(easy_handle, CURLOPT_COOKIEFILE, "cookie.txt");
 		curl_easy_setopt(easy_handle, CURLOPT_FOLLOWLOCATION, 1L);
-		std::string url = "http://download.csdn.net/index.php/comment/post_comment?jsonpcallback=jsonp1385304626524&sourceid=" + sourceId + "&content=%E9%9D%9E%E5%B8%B8%E6%84%9F%E8%B0%A2%EF%BC%8C%E8%BF%99%E8%B5%84%E6%BA%90%E6%88%91%E6%89%BE%E4%BA%86%E5%A5%BD%E4%B9%85%E4%BA%86%EF%BC%81&rating=5&t=1385304679900";
+		std::string url = "http://download.csdn.net/index.php/comment/post_comment?jsonpcallback=jQuery111103831024526099105_1504531325955&sourceid=" + sourceId + "&content=%E5%A5%BD%E4%B8%9C%E8%A5%BF%EF%BC%8C%E8%B0%A2%E8%B0%A2%EF%BC%81&txt_validcode=undefined&rating=5&t=1504531348007&_=1504531325959";
 		std::string referer = "Referer: http://download.csdn.net/detail/wasdzxce/" + sourceId;
 		//http请求头
 		struct curl_slist *headers = NULL;
